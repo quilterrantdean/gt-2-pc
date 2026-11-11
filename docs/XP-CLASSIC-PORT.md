@@ -108,9 +108,12 @@ the game unusably slow.
 
 ## Implementation stages
 
-1. Add the XP build profile and isolate its source/dependency set.
-2. Implement a minimal OpenGL context and renderer that clears the screen,
-   draws untextured/textured triangles and handles depth.
+1. **Build profile and capability check (started):** `GT2_XP_CLASSIC` enforces
+   Win32/i686, excludes Vulkan and developer tests, and builds `gt2xpglcheck`.
+   `build-xp.cmd` configures this profile from a 32-bit MinGW shell. The check
+   reports the active OpenGL driver, limits, anisotropy and WGL swap control.
+2. Implement the game window's OpenGL context and a renderer that clears the
+   screen, draws untextured/textured triangles and handles depth.
 3. Add GT2 texture/CLUT decoding, transparent polygon passes and the complete
    original scene path.
 4. Add the original menus/HUD, audio, input and save flow.
