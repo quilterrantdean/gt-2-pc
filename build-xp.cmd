@@ -2,7 +2,7 @@
 rem Configure the isolated 32-bit Windows XP profile with the active MinGW toolchain.
 setlocal
 
-where gcc >nul 2>nul
+gcc -dumpmachine >nul 2>nul
 if errorlevel 1 (
   echo ERROR: gcc was not found. Run this from the w64devkit shell.
   exit /b 1
