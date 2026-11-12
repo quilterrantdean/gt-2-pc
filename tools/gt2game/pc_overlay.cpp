@@ -148,6 +148,12 @@ template<size_t N> int Cycle(int value, const int (&values)[N], int direction) {
     const int index = it == std::end(values) ? 0 : int(it - std::begin(values));
     return values[(index + direction + int(N)) % int(N)];
 }
+int Cycle(int value, const std::vector<int>& values, int direction) {
+    if (values.empty()) return value;
+    const auto it = std::find(values.begin(), values.end(), value);
+    const int index = it == values.end() ? 0 : int(it - values.begin());
+    return values[size_t((index + direction + int(values.size())) % int(values.size()))];
+}
 
 void Save() {
     const auto dir = std::filesystem::path(settingsPath).parent_path();
@@ -1077,7 +1083,11 @@ void ShowSettingsMenu(GameWindow& window) {
                 "Vibration: " + std::to_string(rumble) + "%",
                 std::string("Texture filtering: ") + (graphics.smoothTextures ? "Smooth" : "Nearest"),
                 std::string("Mipmapping: ") + (graphics.mipmaps ? "ON" : "OFF"),
-                std::string("Anisotropic filtering: ") + (graphics.anisotropy == 0 ? "OFF" : std::to_string(graphics.anisotropy) + "x" + (graphics.smoothTextures ? "" : " (needs smooth)")),
+                std::string("Anisotropic filtering: ") +
+                    (graphics.anisotropy == 0 ? "OFF" :
+                     std::to_string(graphics.anisotropy) + "x" +
+                     (graphics.anisotropy > int(window.Renderer().MaxAnisotropy()) ? " (unsupported by driver)" :
+                      (!graphics.smoothTextures ? " (needs smooth)" : ""))),
                 "Display timing...",
                 std::string("PlayStation intro: ") + (playStationIntro ? "ON" : "OFF"),
                 "Back"
@@ -1242,8 +1252,11 @@ void ShowSettingsMenu(GameWindow& window) {
                 else if (page == 1 && (direction || selected == 9)) {
                     const int distances[] = {0,250,500,1000,2000,-1};
                     const int caps[] = {0,30,45,60,72,80,90,120};
-                    const int anisotropy[] = {0,2,4};
-                    status = "Saved.";
+                    std::vector<int> anisotropy{0};
+                    const uint32_t maximumAnisotropy = window.Renderer().MaxAnisotropy();
+                    if (maximumAnisotropy >= 2) anisotropy.push_back(2);
+                    if (maximumAnisotropy >= 4) anisotropy.push_back(4);
+                    status = maximumAnisotropy > 1 ? "Saved." : "This OpenGL driver does not support anisotropic filtering.";
                     if (selected == 0 && direction) {
                         const int sizes[][2] = {{640,480},{800,600},{1024,768}};
                         int index = 0;
