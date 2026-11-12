@@ -1,4 +1,6 @@
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
 #include <GL/gl.h>
 
@@ -24,7 +26,10 @@ T WglProc(const char* name) {
         proc == reinterpret_cast<PROC>(-1)) {
         return nullptr;
     }
-    return reinterpret_cast<T>(proc);
+    T function{};
+    static_assert(sizeof(function) == sizeof(proc), "WGL function pointer size mismatch");
+    std::memcpy(&function, &proc, sizeof(function));
+    return function;
 }
 
 bool HasExtension(const char* extensions, const char* wanted) {

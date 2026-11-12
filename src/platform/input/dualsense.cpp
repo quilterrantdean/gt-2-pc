@@ -5,6 +5,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
+#include <cstring>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -20,7 +21,11 @@ BOOL CancelOverlappedIo(HANDLE device, LPOVERLAPPED overlapped) {
     using CancelIoExFn = BOOL(WINAPI*)(HANDLE, LPOVERLAPPED);
     static CancelIoExFn cancelIoEx = []() -> CancelIoExFn {
         HMODULE kernel = GetModuleHandleW(L"kernel32.dll");
-        return kernel ? reinterpret_cast<CancelIoExFn>(GetProcAddress(kernel, "CancelIoEx")) : nullptr;
+        FARPROC address = kernel ? GetProcAddress(kernel, "CancelIoEx") : nullptr;
+        CancelIoExFn function = nullptr;
+        static_assert(sizeof(function) == sizeof(address), "Win32 function pointer size mismatch");
+        std::memcpy(&function, &address, sizeof(function));
+        return function;
     }();
     return cancelIoEx ? cancelIoEx(device, overlapped) : CancelIo(device);
 }

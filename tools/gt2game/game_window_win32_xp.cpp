@@ -1,5 +1,7 @@
 // Windows XP / OpenGL 1.5 window backend for the Classic profile.
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include "game_window.h"
 
 #include <windows.h>

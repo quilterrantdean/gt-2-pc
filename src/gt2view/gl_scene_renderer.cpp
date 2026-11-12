@@ -1,4 +1,6 @@
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
 #include "gt2view/gl_scene_renderer.h"
 
 #include <windows.h>
@@ -77,7 +79,10 @@ T WglProc(const char* name) {
     PROC proc = wglGetProcAddress(name);
     if (!proc || proc == reinterpret_cast<PROC>(1) || proc == reinterpret_cast<PROC>(2) ||
         proc == reinterpret_cast<PROC>(3) || proc == reinterpret_cast<PROC>(-1)) return nullptr;
-    return reinterpret_cast<T>(proc);
+    T function{};
+    static_assert(sizeof(function) == sizeof(proc), "WGL function pointer size mismatch");
+    std::memcpy(&function, &proc, sizeof(function));
+    return function;
 }
 
 bool HasExtension(const char* extensions, const char* wanted) {
@@ -690,7 +695,8 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, 
                 glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_RGB, GL_SRC_COLOR);
                 // The native 0x80 vertex colour is neutral. Doubling the
                 // normalised 5-bit texture x colour reproduces 255/128.
-                glTexEnvf(GL_TEXTURE_ENV, GL_RGB_SCALE, externalTexture ? 1.0f : 2.0f);
+                glTexEnvf(GL_TEXTURE_ENV, GL_RGB_SCALE,
+                          (externalTexture || (vertex.flags & kIntegerModulate)) ? 1.0f : 2.0f);
             }
         } else {
             if (item.stpPass == 1) { first = last; continue; }
