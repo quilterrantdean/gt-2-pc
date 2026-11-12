@@ -490,7 +490,7 @@ uint32_t GlSceneRenderer::TextureFor(uint32_t page, uint32_t clut, uint32_t flag
 
 bool GlSceneRenderer::IsClassicTriangle(const SceneVertex& vertex) const {
     constexpr uint32_t unsupported = kHandTexture | kHdUi | kReconstructedUi | kUiMap |
-        kSmoothUi | kModelNative | kModelReflection | kModelBlend | kModelAtlasTexture;
+        kModelNative | kModelReflection | kModelBlend | kModelAtlasTexture;
     return (vertex.flags & unsupported) == 0;
 }
 
