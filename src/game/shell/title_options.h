@@ -99,6 +99,12 @@ struct GraphicsSettings {
     int renderHeight = 0;                  // fixed 16:9 scene: 720/1080/1440/2160; 0 uses window scale
     int renderScale = 100;                 // internal resolution of the 3D scene, percent of the window (50..200)
     int msaa = 1;                          // multisampling of the 3D scene: 1 (off), 2, 4, 8
+#ifdef GT2_XP_CLASSIC
+    bool mipmaps = false;                  // XP: opt-in; keeps the texture cache smaller by default
+#else
+    bool mipmaps = true;
+#endif
+    int anisotropy = 0;                    // 0 (off), 2 or 4; clamped to the driver's extension limit
     bool smoothTextures = false;           // false: the PS1's nearest texel; true: CLUT-aware bilinear
     bool affine = false;                   // true: the PS1's screen-linear texture mapping; false: perspective-correct
     bool modernCarReflections = false; // opt-in cube reflections for original GT2 bodies
@@ -113,6 +119,8 @@ struct GraphicsSettings {
     static GraphicsSettings Modern() {
         GraphicsSettings g;
         g.msaa = 4;
+        g.mipmaps = true;
+        g.anisotropy = 4;
         g.smoothTextures = true;
         g.maxDetail = true;
         g.drawDistance = 1000;
