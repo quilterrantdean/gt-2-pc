@@ -105,7 +105,6 @@ private:
     using BlendColorProc = void (__stdcall *)(float, float, float, float);
     BlendEquationProc blendEquation_ = nullptr;
     BlendColorProc blendColor_ = nullptr;
-    RenderOptions options_;
     CullingStats culling_;
 };
 
