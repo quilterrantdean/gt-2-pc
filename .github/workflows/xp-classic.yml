@@ -20,12 +20,12 @@ jobs:
           install: >-
             mingw-w64-i686-gcc
             mingw-w64-i686-cmake
-            mingw-w64-i686-make
+            mingw-w64-i686-ninja
       - name: Configure XP profile
         shell: msys2 {0}
         run: >
           cmake -S . -B build-xp
-          -G "MinGW Makefiles"
+          -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DGT2_XP_CLASSIC=ON
           -DGT2_WARNINGS_AS_ERRORS=OFF
