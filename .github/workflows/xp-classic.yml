@@ -1,0 +1,48 @@
+name: Windows XP Classic build
+
+on:
+  push:
+    branches: [xp-classic]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-xp:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW32
+          update: true
+          install: >-
+            mingw-w64-i686-gcc
+            mingw-w64-i686-cmake
+            mingw-w64-i686-make
+      - name: Configure XP profile
+        shell: msys2 {0}
+        run: >
+          cmake -S . -B build-xp
+          -G "MinGW Makefiles"
+          -DCMAKE_BUILD_TYPE=Release
+          -DGT2_XP_CLASSIC=ON
+          -DGT2_WARNINGS_AS_ERRORS=OFF
+      - name: Build game and utilities
+        shell: msys2 {0}
+        run: cmake --build build-xp --target gt2game gt2xpglcheck gt2install --parallel 2
+      - name: Check executable architecture and imports
+        shell: msys2 {0}
+        run: |
+          objdump -f build-xp/gt2game.exe
+          objdump -p build-xp/gt2game.exe | grep -E "DLL Name|MajorOperatingSystemVersion|MinorOperatingSystemVersion|MajorSubsystemVersion|MinorSubsystemVersion"
+      - name: Upload XP build
+        uses: actions/upload-artifact@v4
+        with:
+          name: gt2-pc-windows-xp-i686
+          path: |
+            build-xp/gt2game.exe
+            build-xp/gt2xpglcheck.exe
+            build-xp/gt2install.exe
+          if-no-files-found: error
