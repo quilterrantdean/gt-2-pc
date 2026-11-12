@@ -70,7 +70,7 @@ private:
     void UploadTexture(size_t slot);
     void DecodeTexture(const TextureEntry& entry, std::vector<uint8_t>& rgba) const;
     void SaveScreenshot(const std::string& path);
-    void DrawItemRange(const DrawItem& item, size_t itemIndex, bool sceneItem);
+    void DrawItemRange(const DrawItem& item, size_t itemIndex, bool sceneItem, bool mirrorPass = false);
     bool IsClassicTriangle(const SceneVertex& vertex) const;
     void InvalidateTextures(uint32_t firstRow, uint32_t rowCount);
 
@@ -81,6 +81,8 @@ private:
     std::vector<uint16_t> vram_;
     std::vector<TextureEntry> textureEntries_;
     std::vector<uint32_t> textureIds_;
+    uint32_t mirrorTextureId_ = 0;
+    uint32_t overlayTextureId_ = 0;
     std::unordered_map<uint64_t, size_t> textureLookup_;
     uint64_t useClock_ = 0;
     uint32_t cachedMaterials_ = 0, uncachedMaterials_ = 0;
