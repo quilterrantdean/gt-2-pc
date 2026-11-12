@@ -24,10 +24,25 @@ std::vector<std::pair<std::string, std::string>> g_overrides;
 const gt2::shell::GraphicsSettings& CurrentGraphics() { return g_graphics; }
 
 void SetGraphicsFromSettings(const gt2::shell::GraphicsSettings& settings) {
-    if (!g_pinned && !g_overlay) {g_graphics = settings;gt2::modernCarReflections=settings.modernCarReflections;}
+    if (!g_pinned && !g_overlay) {
+        g_graphics = settings;
+#ifdef GT2_XP_CLASSIC
+        gt2::modernCarReflections = false;
+#else
+        gt2::modernCarReflections = settings.modernCarReflections;
+#endif
+    }
 }
 void SetGraphicsFromOverlay(const gt2::shell::GraphicsSettings& settings) {
-    if (!g_pinned) { g_graphics = settings; g_overlay = true; gt2::modernCarReflections=settings.modernCarReflections;}
+    if (!g_pinned) {
+        g_graphics = settings;
+        g_overlay = true;
+#ifdef GT2_XP_CLASSIC
+        gt2::modernCarReflections = false;
+#else
+        gt2::modernCarReflections = settings.modernCarReflections;
+#endif
+    }
 }
 
 bool GraphicsPinned() { return g_pinned; }
@@ -88,7 +103,11 @@ gt2view::RenderOptions RenderOptionsOf(const gt2::shell::GraphicsSettings& s) {
     o.mipmaps = s.mipmaps;
     o.anisotropy = uint32_t(s.anisotropy);
     o.smoothTextures = s.smoothTextures;
-    gt2::modernCarReflections=s.modernCarReflections;
+#ifdef GT2_XP_CLASSIC
+    gt2::modernCarReflections = false;
+#else
+    gt2::modernCarReflections = s.modernCarReflections;
+#endif
     o.vsync = s.vsync;
     return o;
 }
