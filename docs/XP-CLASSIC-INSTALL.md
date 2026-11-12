@@ -6,8 +6,11 @@ This is the native 32-bit Windows XP build profile. It uses the OpenGL fixed-fun
 
 - Windows XP SP3, 32-bit.
 - An OpenGL 1.5 driver with a hardware-accelerated implementation.
+- Pentium 4 Prescott or later compatible with the XP Classic build's SSE3 target.
 - At least a 256 × 256 maximum texture size.
 - A genuine Gran Turismo 2 BIN image in raw 2352-byte-per-sector format. A 2048-byte ISO is not sufficient because it does not preserve the XA audio and movie data.
+
+The native build is compiled with GCC's Prescott instruction selection and tuning (SSE3). It is not intended for pre-Prescott processors.
 
 The initial graphics defaults are 800 × 600 windowed, VSync on, mipmapping off, anisotropic filtering off and perspective-correct texture mapping. The available window sizes are 640 × 480, 800 × 600 and 1024 × 768. Actual support depends on the display and driver.
 

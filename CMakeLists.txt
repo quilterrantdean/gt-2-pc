@@ -16,6 +16,8 @@ if(GT2_XP_CLASSIC)
   set(GT2_BUILD_LINUX_CLIENT OFF CACHE BOOL "Disable Linux client in the XP profile" FORCE)
   add_compile_definitions(GT2_XP_CLASSIC=1 WINVER=0x0501 _WIN32_WINNT=0x0501)
   if(MINGW)
+    # Initial performance target: Pentium 4 Prescott (SSE3), 32-bit.
+    add_compile_options(-march=prescott -mtune=prescott)
     # Emit a PE executable whose declared minimum OS and subsystem are Windows 5.01.
     add_link_options(-static -static-libgcc -static-libstdc++
       -Wl,--major-os-version,5,--minor-os-version,1

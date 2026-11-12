@@ -36,6 +36,12 @@ Supply your own supported disc images. Game data, BIOS and saves are not include
 The screenshots illustrate gameplay. Release history is in
 [CHANGELOG.md](CHANGELOG.md); the feature list below describes the current project.
 
+## Windows XP Classic (experimental)
+
+The fork's `xp-classic` branch contains a native 32-bit Windows XP build using an OpenGL 1.5 fixed-function renderer, targeted at Pentium 4 Prescott-class PCs. It is separate from the normal Vulkan desktop build.
+
+See [Windows XP Classic installation and compatibility notes](docs/XP-CLASSIC-INSTALL.md). The build requires the user's own supported Gran Turismo 2 disc image and has not yet been validated on the target XP hardware.
+
 ## Version and bug reports
 
 Open the custom **GT2 settings menu** (F10 on desktop, the settings/menu button
