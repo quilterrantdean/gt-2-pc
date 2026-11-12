@@ -124,8 +124,18 @@ bool GraphicsSettings::Parse(const std::string& key, const std::string& value) {
     else if (key == "msaa") msaa = v >= 8 ? 8 : v >= 4 ? 4 : v >= 2 ? 2 : 1;
     else if (key == "mipmaps") mipmaps = v != 0;
     else if (key == "anisotropy") anisotropy = v >= 4 ? 4 : v >= 2 ? 2 : 0;
+#ifdef GT2_XP_CLASSIC
+    else if (key == "window_width") windowWidth = clamp(v, 320, 2048);
+    else if (key == "window_height") windowHeight = clamp(v, 240, 1536);
+#endif
     else if (key == "texture_filter") smoothTextures = value == "smooth";
-    else if (key == "modern_car_reflections") modernCarReflections = v != 0;
+    else if (key == "modern_car_reflections") {
+#ifdef GT2_XP_CLASSIC
+        modernCarReflections = false;
+#else
+        modernCarReflections = v != 0;
+#endif
+    }
     else if (key == "texture_mapping") {
 #ifdef GT2_XP_CLASSIC
         affine = false;
@@ -149,6 +159,10 @@ std::string GraphicsSettings::Serialize() const {
     o << "msaa=" << msaa << "\n";
     o << "mipmaps=" << int(mipmaps) << "\n";
     o << "anisotropy=" << anisotropy << "\n";
+#ifdef GT2_XP_CLASSIC
+    o << "window_width=" << windowWidth << "\n";
+    o << "window_height=" << windowHeight << "\n";
+#endif
     o << "texture_filter=" << (smoothTextures ? "smooth" : "nearest") << "\n";
     o << "modern_car_reflections=" << int(modernCarReflections) << "\n";
     o << "texture_mapping=" << (affine ? "affine" : "perspective") << "\n";
