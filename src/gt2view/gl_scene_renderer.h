@@ -84,6 +84,12 @@ private:
     std::vector<uint32_t> textureIds_;
     uint32_t mirrorTextureId_ = 0;
     uint32_t overlayTextureId_ = 0;
+    uint32_t externalTextureId_ = 0;
+    uint32_t externalTextureFirst_ = 0;
+    uint32_t externalTexturePage_ = 0;
+    uint32_t externalTextureWidth_ = 0, externalTextureHeight_ = 0;
+    bool externalTextureDirty_ = true;
+    std::vector<uint32_t> externalTexels_;
     std::unordered_map<uint64_t, size_t> textureLookup_;
     uint64_t useClock_ = 0;
     uint32_t cachedMaterials_ = 0, uncachedMaterials_ = 0;
