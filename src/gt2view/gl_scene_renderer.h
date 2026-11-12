@@ -38,6 +38,7 @@ public:
     Size StereoExtent() const { return {}; }
     float AspectRatio() const { return extent_.height ? float(extent_.width) / float(extent_.height) : 4.0f / 3.0f; }
     uint32_t EffectiveMsaa() const { return 1; }
+    uint32_t MaxAnisotropy() const { return anisotropyAvailable_ ? static_cast<uint32_t>(maxAnisotropy_) : 1u; }
     int PresentMode() const { return options_.vsync ? 2 : 0; }
     int Foveation() const { return 0; }
     void SetFoveation(int level);
