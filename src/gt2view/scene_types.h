@@ -189,6 +189,7 @@ struct RenderOptions {
     float sceneScale = 1.0f;     // internal resolution of the scene, times the window (0.5 .. 2)
     uint32_t msaa = 1;           // multisampling of the scene: 1 (off), 2, 4, 8 (clamped to the GPU's limit)
     bool mipmaps = true;
+    uint32_t anisotropy = 0; // 0 = off; supported levels are clamped by the backend
     bool smoothTextures = false; // bilinear filtering of the decoded PS1 texels (CLUT-aware, inside the polygon's UV
                                  // rectangle, STP class kept); false = the PS1's nearest texel (exact)
     bool affine = false;         // screen-linear (PS1 GPU) texture / colour interpolation; false = perspective-correct
