@@ -11,6 +11,21 @@
 #include <algorithm>
 
 namespace gt2::input {
+namespace {
+
+// CancelIoEx was introduced in Windows Vista. Prefer it when present, but
+// fall back to XP's CancelIo. Each overlapped operation below is issued and
+// cancelled by the same dedicated reader/worker thread, as CancelIo requires.
+BOOL CancelOverlappedIo(HANDLE device, LPOVERLAPPED overlapped) {
+    using CancelIoExFn = BOOL(WINAPI*)(HANDLE, LPOVERLAPPED);
+    static CancelIoExFn cancelIoEx = []() -> CancelIoExFn {
+        HMODULE kernel = GetModuleHandleW(L"kernel32.dll");
+        return kernel ? reinterpret_cast<CancelIoExFn>(GetProcAddress(kernel, "CancelIoEx")) : nullptr;
+    }();
+    return cancelIoEx ? cancelIoEx(device, overlapped) : CancelIo(device);
+}
+
+} // namespace
 struct DualSenseEffects::Impl {
     HANDLE device = INVALID_HANDLE_VALUE;
     std::atomic<bool> ok{false};
@@ -38,7 +53,7 @@ struct DualSenseEffects::Impl {
             if (!received && GetLastError() == ERROR_IO_PENDING) {
                 DWORD wait;
                 do { wait = WaitForSingleObject(io.hEvent, 50); } while (wait == WAIT_TIMEOUT && !stop);
-                if (wait != WAIT_OBJECT_0) CancelIoEx(device, &io);
+                if (wait != WAIT_OBJECT_0) CancelOverlappedIo(device, &io);
                 received = GetOverlappedResult(device, &io, &count, TRUE);
             }
             if (stop) break;
@@ -78,7 +93,7 @@ struct DualSenseEffects::Impl {
             // Win32 HID writes require padding to the maximum output report length.
             BOOL sent = WriteFile(device, packet.data(), outputLength, &written, &io);
             if (!sent && GetLastError() == ERROR_IO_PENDING) {
-                if (WaitForSingleObject(io.hEvent, 100) != WAIT_OBJECT_0) CancelIoEx(device, &io);
+                if (WaitForSingleObject(io.hEvent, 100) != WAIT_OBJECT_0) CancelOverlappedIo(device, &io);
                 sent = GetOverlappedResult(device, &io, &written, TRUE);
             }
             if (!sent || written != outputLength) {
