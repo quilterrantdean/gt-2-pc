@@ -83,6 +83,7 @@ public:
     // The platform's window handle (HWND on Windows) for the input devices; null when there is none.
     virtual void* NativeHandle() const = 0;
     virtual void SetTitle(const std::string& title) = 0;
+    virtual bool SetClientSize(int, int) { return false; }
 
     // Services the event queue; called once at the start of every presentation frame.
     virtual void Pump() = 0;
@@ -205,6 +206,7 @@ public:
 
     // The window's caption (the screens name themselves).
     void SetTitle(const std::string& title) { backend_->SetTitle(title); }
+    bool SetClientSize(int width, int height) { return backend_->SetClientSize(width, height); }
     gt2view::SceneRenderer& Renderer() { return backend_->Renderer(); }
 
     // Adds scripted presses (may be called several times; all use the global field numbering).
