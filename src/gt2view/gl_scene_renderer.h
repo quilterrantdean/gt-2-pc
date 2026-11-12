@@ -65,7 +65,7 @@ private:
     void ApplyTextureOptions(bool sceneItem);
     void SetScissor(const DrawItem& item);
     void SetProjection(const DrawItem& item, uint32_t flags);
-    GLuint TextureFor(uint32_t page, uint32_t clut, uint32_t flags, const DrawItem& item,
+    uint32_t TextureFor(uint32_t page, uint32_t clut, uint32_t flags, const DrawItem& item,
                       bool sceneItem);
     void UploadTexture(size_t slot);
     void DecodeTexture(const TextureEntry& entry, std::vector<uint8_t>& rgba) const;
