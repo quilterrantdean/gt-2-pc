@@ -203,6 +203,10 @@ int GameMain(int argc, char** argv) {
         SetGraphicsFromSettings(fileGraphics);
         gt2::SetGt4ModelSetRoot(argv[1], gt2::os::DataRoot());
         LoadOverlaySettings(titleOptions.settingsPath);
+#ifdef GT2_XP_CLASSIC
+        windowWidth = CurrentGraphics().windowWidth;
+        windowHeight = CurrentGraphics().windowHeight;
+#endif
         std::string frameLogPath;  // --frame-log <csv> (race_view.h)
         double interpAlpha = -1;   // --interp-alpha A (race_view.h)
         for (int i = 2; i < argc; i++) {
