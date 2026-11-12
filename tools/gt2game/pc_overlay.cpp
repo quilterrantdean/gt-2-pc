@@ -1538,7 +1538,13 @@ std::string SelectGameDisc(const std::string& root, const std::string& preferred
     gameChangeAvailable = modes.size() > 1;
     gameChangeRequested = false;
     SetVrMode(vrMode, deterministic); VrOptions vr; vr.stereo = false; SetVrOptions(vr);
-    GameWindow window("Gran Turismo 2 - Choose disc", 1280, 960); window.EnableNativeMenu(false); PrepareNativeUi(window.Renderer());
+#ifdef GT2_XP_CLASSIC
+    const auto& pickerGraphics = CurrentGraphics();
+    GameWindow window("Gran Turismo 2 - Choose disc", pickerGraphics.windowWidth, pickerGraphics.windowHeight);
+#else
+    GameWindow window("Gran Turismo 2 - Choose disc", 1280, 960);
+#endif
+    window.EnableNativeMenu(false); PrepareNativeUi(window.Renderer());
     if (!script.empty()) window.AddScript(script);
     if (!shot.empty()) window.AddShot(2, shot);
     consoleStartupHandled = true;
