@@ -33,7 +33,11 @@ std::string g_fakePad, g_fakePad2;
 int g_rumbleScale = 100;
 bool g_vr = false, g_vrDeterministic = false;
 bool g_noFocus = false;
+#ifdef GT2_XP_CLASSIC
+bool g_windowed = true;
+#else
 bool g_windowed = false;
+#endif
 VrOptions g_vrOptions;
 std::unique_ptr<WindowBackend> retainedBackend;
 } // namespace
