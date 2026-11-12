@@ -284,6 +284,13 @@ void LoadOverlaySettings(const std::string& basePath) {
         }
     }
     if (raceView < 0 && legacyOpenView) raceView = 3;
+#ifdef GT2_XP_CLASSIC
+    gt4ModelSet = false;
+    gt2::hd::SetEnabled(false);
+    profiler = false;
+    graphics.modernCarReflections = false;
+    graphics.affine = false;
+#endif
     SetGraphicsFromOverlay(graphics);
     gt2::pc::SetUnlocks(courses, cars);
 }
@@ -1017,7 +1024,12 @@ void ShowSettingsMenu(GameWindow& window) {
         std::vector<std::string> rows;
         std::string title = "GT2 VR / MENU";
         if (page == 0) {
+#ifdef GT2_XP_CLASSIC
+            rows = {"Graphics and performance", "Cheats", "HUD elements", "Controls",
+                "Change game (Arcade / Simulation)", "Original game pause / exit", "Resume game"};
+#else
             rows = {"Graphics and performance", "Cheats", "HUD elements", "Controls", "Change game (Arcade / Simulation)", "Original game pause / exit", "Cockpit / driver view", "Resume game"};
+#endif
             if (discImportAvailable) rows.push_back("Import another game disc...");
             rows.push_back("Campaign / saves...");
             rows.push_back("Quit game");
@@ -1057,9 +1069,24 @@ void ShowSettingsMenu(GameWindow& window) {
                 std::string("GT4 car models: ") + (gt4ModelSet ? "ON" : "OFF"), "Back"};
         }
         if (page == 1 && !vr) {
+#ifdef GT2_XP_CLASSIC
+            rows = {
+                "Window size: " + std::to_string(graphics.windowWidth) + "x" + std::to_string(graphics.windowHeight),
+                "Frame limit: " + (graphics.frameCap ? std::to_string(graphics.frameCap) + " FPS" : std::string("Display")),
+                "Draw distance: " + (graphics.drawDistance < 0 ? std::string("Entire course") : graphics.drawDistance == 0 ? std::string("Original") : std::to_string(graphics.drawDistance) + " m"),
+                "Vibration: " + std::to_string(rumble) + "%",
+                std::string("Texture filtering: ") + (graphics.smoothTextures ? "Smooth" : "Nearest"),
+                std::string("Mipmapping: ") + (graphics.mipmaps ? "ON" : "OFF"),
+                std::string("Anisotropic filtering: ") + (graphics.anisotropy == 0 ? "OFF" : std::to_string(graphics.anisotropy) + "x" + (graphics.smoothTextures ? "" : " (needs smooth)")),
+                "Display timing...",
+                std::string("PlayStation intro: ") + (playStationIntro ? "ON" : "OFF"),
+                "Back"
+            };
+#else
             rows[0] = "Resolution: " + (graphics.renderHeight ? std::to_string(graphics.renderHeight) + "p" : std::to_string(graphics.renderScale) + "%");
             rows[1] = "Frame limit: " + (graphics.frameCap ? std::to_string(graphics.frameCap) + " FPS" : std::string("Display"));
             rows[7] = "Display timing...";
+#endif
         }
         if (page == 8) {
             title = "GT2 / DISPLAY TIMING";
@@ -1067,12 +1094,20 @@ void ShowSettingsMenu(GameWindow& window) {
                     std::string("Frame presentation: ") + (graphics.frameRate ? "Display rate" : "Original"), "Back"};
         }
         if (page == 2) {
-            title = "GT2 VR / CHEATS";
+            title = "GT2 / CHEATS";
+#ifdef GT2_XP_CLASSIC
+            rows = {"Arcade - all tracks: " + std::string(gt2::pc::unlockCourses ? "ON" : "OFF"),
+                "Arcade - all cars: " + std::string(gt2::pc::unlockCars ? "ON" : "OFF"),
+                "Simulation - all licences GOLD", "Simulation - 99,999,999 credits", "Simulation - all cars catalogue",
+                "Simulation - event unlock: " + std::string(gt2::pc::unlockSimulationEvents ? "ON" : "OFF"),
+                "Arcade - add all cars to garage", "Auto replay: " + std::string(gt2::pc::skipRaceReplays ? "OFF" : "ON"), "Back"};
+#else
             rows = {"Arcade - all tracks: " + std::string(gt2::pc::unlockCourses ? "ON" : "OFF"),
                 "Arcade - all cars: " + std::string(gt2::pc::unlockCars ? "ON" : "OFF"),
                 "Simulation - all licences GOLD", "Simulation - 99,999,999 credits", "Simulation - all cars catalogue",
                 "Simulation - event unlock: " + std::string(gt2::pc::unlockSimulationEvents ? "ON" : "OFF"), "Simulation - GT4 cars catalogue", "Arcade - add all cars to garage",
                 "Auto replay: " + std::string(gt2::pc::skipRaceReplays ? "OFF" : "ON"), "Back"};
+#endif
         }
         if (page == 3) {
             title = std::string(catalogueGt4 ? "GT4 CARS / PAGE " : "ALL CARS / PAGE ") + std::to_string(carPage + 1);
@@ -1151,7 +1186,9 @@ void ShowSettingsMenu(GameWindow& window) {
                         if (gameChangeAvailable) { page = 9; selected = 1; }
                         else status = "Launch from the disc picker with both discs installed.";
                     }
+#ifndef GT2_XP_CLASSIC
                     else if (selected == 6) { page = 10; selected = 0; status = "Driver view settings."; }
+#endif
                     else if (selected == 8 + int(discImportAvailable)) { done = ShowCampaignManager(window); }
                     else if (selected >= 8) { page = discImportAvailable && selected == 8 ? 11 : 12; selected = 1; }
                     else if (selected >= 5) { if (selected == 5) window.RequestGamePause(); done = true; }
@@ -1191,6 +1228,39 @@ void ShowSettingsMenu(GameWindow& window) {
                         window.Close(); done = true;
                     } else { page = 0; selected = 4; }
                 }
+#ifdef GT2_XP_CLASSIC
+                else if (page == 1 && (direction || selected == 9)) {
+                    const int distances[] = {0,250,500,1000,2000,-1};
+                    const int caps[] = {0,30,45,60,72,80,90,120};
+                    const int anisotropy[] = {0,2,4};
+                    status = "Saved.";
+                    if (selected == 0 && direction) {
+                        const int sizes[][2] = {{640,480},{800,600},{1024,768}};
+                        int index = 0;
+                        for (int i = 0; i < 3; ++i)
+                            if (graphics.windowWidth == sizes[i][0] && graphics.windowHeight == sizes[i][1]) index = i;
+                        const int next = (index + (direction > 0 ? 1 : -1) + 3) % 3;
+                        if (window.SetClientSize(sizes[next][0], sizes[next][1])) {
+                            graphics.windowWidth = sizes[next][0];
+                            graphics.windowHeight = sizes[next][1];
+                        } else {
+                            status = "Cannot resize while fullscreen. Press Alt+Enter first.";
+                        }
+                    }
+                    if (selected == 1) graphics.frameCap = Cycle(graphics.frameCap, caps, direction);
+                    if (selected == 2) graphics.drawDistance = Cycle(graphics.drawDistance, distances, direction);
+                    if (selected == 3) rumble = std::clamp(rumble + direction * 5, 0, 100);
+                    if (selected == 4) graphics.smoothTextures = !graphics.smoothTextures;
+                    if (selected == 5) graphics.mipmaps = !graphics.mipmaps;
+                    if (selected == 6) graphics.anisotropy = Cycle(graphics.anisotropy, anisotropy, direction);
+                    if (selected == 7 && accept) { page = 8; selected = 0; }
+                    if (selected == 8 && direction) playStationIntro = !playStationIntro;
+                    if (selected == 9 && accept) { page = 0; selected = 0; }
+                    SetGraphicsFromOverlay(graphics);
+                    window.Renderer().SetOptions(RenderOptionsOf(CurrentGraphics()));
+                    window.Input().SetRumbleScale(rumble);
+                }
+#else
                 else if (page == 1 && (direction || selected == 12)) {
                     const int samples[] = {1,2,4,8}, distances[] = {0,250,500,1000,2000,-1};
                     status = "Saved.";
@@ -1232,7 +1302,9 @@ void ShowSettingsMenu(GameWindow& window) {
                     if (page==1 && selected==10 && direction) graphics.modernCarReflections=!graphics.modernCarReflections;
                     SetGraphicsFromOverlay(graphics); window.Renderer().SetOptions(RenderOptionsOf(graphics));
                     window.Input().SetRumbleScale(rumble);
-                } else if (page == 8) {
+                }
+#endif
+                else if (page == 8) {
                     if (selected == 0) graphics.vsync = !graphics.vsync;
                     if (selected == 1) graphics.frameRate = !graphics.frameRate;
                     if (selected == 2) { page = 1; selected = 7; }
@@ -1243,10 +1315,18 @@ void ShowSettingsMenu(GameWindow& window) {
                     if (selected == 1 && direction) gt2::pc::SetUnlocks(gt2::pc::unlockCourses, !gt2::pc::unlockCars);
                     if (selected == 2 && accept) status = ApplySimulationCheat(0);
                     if (selected == 3 && accept) status = ApplySimulationCheat(1);
+#ifdef GT2_XP_CLASSIC
+                    if (selected == 4 && accept) {
+#else
                     if ((selected == 4 || selected == 6) && accept) {
+#endif
                         if (!cheatData) status = "Enter GT Mode first. Catalogue unavailable in races.";
                         else {
+#ifdef GT2_XP_CLASSIC
+                            catalogueGt4=false;
+#else
                             catalogueGt4=selected==6;
+#endif
                             catalogue = gt2::career::CheatCatalogue(*cheatData);
                             if (catalogueGt4) {
                                 try {
@@ -1259,15 +1339,27 @@ void ShowSettingsMenu(GameWindow& window) {
                         }
                     }
                     if (selected == 5 && page == 2 && direction) gt2::pc::unlockSimulationEvents = !gt2::pc::unlockSimulationEvents;
+#ifdef GT2_XP_CLASSIC
+                    if (selected == 6 && accept) {
+#else
                     if (selected == 7 && accept) {
+#endif
                         try {status=arcadeGarageCheat ? arcadeGarageCheat() : "Available in Arcade menus. Cheats are disabled in races.";}
                         catch (const std::exception& e) {status=e.what();}
                     }
+#ifdef GT2_XP_CLASSIC
+                    if (selected == 7 && page == 2 && direction) {
+#else
                     if (selected == 8 && page == 2 && direction) {
+#endif
                         gt2::pc::skipRaceReplays = !gt2::pc::skipRaceReplays;
                         status = "Saved. Automatic replay: " + std::string(gt2::pc::skipRaceReplays ? "OFF." : "ON.");
                     }
+#ifdef GT2_XP_CLASSIC
+                    if (selected == 8 && page == 2) { page = 0; selected = 0; }
+#else
                     if (selected == 9 && page == 2) { page = 0; selected = 0; }
+#endif
                 } else if (page == 4) {
                     if (selected == count - 1) { page = 0; selected = 0; }
                     else if (selected == count - 2) { hudPage = 1 - hudPage; selected = 0; }
