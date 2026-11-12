@@ -101,6 +101,17 @@ uint64_t TextureKey(uint32_t page, uint32_t clutDepth) {
     return (uint64_t(page) << 32) | clutDepth;
 }
 
+uint32_t NextPowerOfTwo(uint32_t value) {
+    if (value <= 1) return 1;
+    --value;
+    value |= value >> 1;
+    value |= value >> 2;
+    value |= value >> 4;
+    value |= value >> 8;
+    value |= value >> 16;
+    return value + 1;
+}
+
 } // namespace
 
 GlSceneRenderer::GlSceneRenderer(void* deviceContext, void* window)
@@ -535,9 +546,13 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, 
                 const uint32_t pageY = vertex.page >> 16;
                 const uint32_t width = static_cast<uint32_t>(x1 - x0 + 1);
                 const uint32_t height = static_cast<uint32_t>(y1 - y0 + 1);
+                // OpenGL 1.5 requires power-of-two texture dimensions. Keep the
+                // source rectangle in the top-left of a padded upload.
+                const uint32_t storageWidth = NextPowerOfTwo(width);
+                const uint32_t storageHeight = NextPowerOfTwo(height);
                 if (pageX + static_cast<uint32_t>(x1) >= kVramWidth ||
                     pageY + static_cast<uint32_t>(y1) >= kVramRows ||
-                    width > maxTextureSize_ || height > maxTextureSize_) {
+                    storageWidth > maxTextureSize_ || storageHeight > maxTextureSize_) {
                     if (!warnedUnsupported_) {
                         std::printf("graphics: an overlay texture exceeds the active OpenGL limits\n");
                         warnedUnsupported_ = true;
@@ -545,12 +560,12 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, 
                     first = last;
                     continue;
                 }
-                std::vector<uint8_t> rgba(size_t(width) * height * 4);
+                std::vector<uint8_t> rgba(size_t(storageWidth) * storageHeight * 4, 0);
                 for (uint32_t y = 0; y < height; ++y) {
                     for (uint32_t x = 0; x < width; ++x) {
                         const uint32_t texel = vram_[size_t(pageY + y0 + static_cast<int>(y)) * kVramWidth +
                                                      pageX + x0 + static_cast<int>(x)];
-                        const size_t at = (size_t(y) * width + x) * 4;
+                        const size_t at = (size_t(y) * storageWidth + x) * 4;
                         rgba[at] = Expand5(texel & 31u);
                         rgba[at + 1] = Expand5((texel >> 5) & 31u);
                         rgba[at + 2] = Expand5((texel >> 10) & 31u);
@@ -562,13 +577,13 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, 
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, static_cast<GLsizei>(width),
-                             static_cast<GLsizei>(height), 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, static_cast<GLsizei>(storageWidth),
+                             static_cast<GLsizei>(storageHeight), 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
                 texture = overlayTextureId_;
                 textureMinX = static_cast<float>(x0);
                 textureMinY = static_cast<float>(y0);
-                textureWidth = static_cast<float>(width);
-                textureHeight = static_cast<float>(height);
+                textureWidth = static_cast<float>(storageWidth);
+                textureHeight = static_cast<float>(storageHeight);
             } else {
                 texture = TextureFor(vertex.page, vertex.clut, vertex.flags, item, sceneItem);
             }
@@ -612,7 +627,9 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, 
                 glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_RGB, GL_PRIMARY_COLOR);
                 glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_RGB, GL_SRC_COLOR);
                 glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_RGB, GL_SRC_COLOR);
-                glTexEnvf(GL_TEXTURE_ENV, GL_RGB_SCALE, (vertex.flags & kIntegerModulate) ? 1.0f : (255.0f / 128.0f));
+                // The native 0x80 vertex colour is neutral. Doubling the
+                // normalised 5-bit texture x colour reproduces 255/128.
+                glTexEnvf(GL_TEXTURE_ENV, GL_RGB_SCALE, 2.0f);
             }
         } else {
             if (item.stpPass == 1) { first = last; continue; }
