@@ -350,7 +350,15 @@ target_link_libraries(gt2verify PRIVATE gt2interp gt2gamelib gt2audio gt2career 
 if(GT2_XP_CLASSIC)
   # OpenGL 1.5 fixed-function backend. It shares scene/game construction but
   # does not compile, find or link Vulkan/OpenXR components.
-  add_library(gt2gl STATIC src/gt2view/gl_scene_renderer.cpp)
+  add_library(gt2gl STATIC
+    src/gt2view/gl_scene_renderer.cpp
+    src/gt2view/hud.cpp
+    src/gt2view/particles.cpp
+    src/gt2view/menu_view.cpp
+    src/gt2view/title_view.cpp
+    src/gt2view/panel_view.cpp
+    src/gt2view/race_overlay_screens.cpp
+    src/gt2view/movie_view.cpp)
   target_include_directories(gt2gl PUBLIC src)
   target_compile_definitions(gt2gl PUBLIC GT2_XP_CLASSIC=1 NOMINMAX WIN32_LEAN_AND_MEAN)
   target_link_libraries(gt2gl PUBLIC gt2export opengl32 gdi32 user32)
