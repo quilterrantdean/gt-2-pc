@@ -58,7 +58,8 @@ bool ParseGraphicsFlag(int argc, char** argv, int& i, const gt2::shell::Graphics
     }
     static const char* const kKeys[][2] = {{"--frame-rate", "frame_rate"},       {"--frame-cap", "frame_cap"},
                                            {"--vsync", "vsync"},                 {"--render-scale", "render_scale"},
-                                           {"--msaa", "msaa"}, {"--render-height", "render_height"},                   {"--texture-filter", "texture_filter"},
+                                           {"--msaa", "msaa"}, {"--render-height", "render_height"}, {"--mipmaps", "mipmaps"},
+                                           {"--anisotropy", "anisotropy"}, {"--texture-filter", "texture_filter"},
                                            {"--texture-mapping", "texture_mapping"}, {"--draw-distance", "draw_distance"}};
     for (const auto& k : kKeys)
         if (a == k[0]) {
@@ -75,9 +76,18 @@ gt2view::RenderOptions RenderOptionsOf(const gt2::shell::GraphicsSettings& s) {
     gt2view::RenderOptions o;
     o.sceneScale = float(std::clamp(s.renderScale, 50, 200)) / 100.0f;
     if (s.renderHeight > 0) { o.sceneHeight = uint32_t(s.renderHeight); o.sceneWidth = o.sceneHeight * 16 / 9; }
+#ifdef GT2_XP_CLASSIC
+    o.msaa = 1;
+    o.sceneScale = 1.0f;
+    o.sceneWidth = o.sceneHeight = 0;
+    o.affine = false;
+#else
     o.msaa = uint32_t(std::clamp(s.msaa, 1, 8));
-    o.smoothTextures = s.smoothTextures;
     o.affine = s.affine;
+#endif
+    o.mipmaps = s.mipmaps;
+    o.anisotropy = uint32_t(s.anisotropy);
+    o.smoothTextures = s.smoothTextures;
     gt2::modernCarReflections=s.modernCarReflections;
     o.vsync = s.vsync;
     return o;
@@ -89,9 +99,10 @@ std::string DescribeGraphics(const gt2::shell::GraphicsSettings& s) {
     else if (s.drawDistance == 0) std::snprintf(distance, sizeof(distance), "original");
     else std::snprintf(distance, sizeof(distance), "+%d m", s.drawDistance);
     char line[320];
-    std::snprintf(line, sizeof(line), "frame rate %s, cap %d, vsync %s, render scale %d%%, MSAA %dx, textures %s, mapping %s, scenery %s, draw distance %s%s%s",
+    std::snprintf(line, sizeof(line), "frame rate %s, cap %d, vsync %s, render scale %d%%, MSAA %dx, mipmaps %s, anisotropy %dx, textures %s, mapping %s, scenery %s, draw distance %s%s%s",
                   s.frameRate == gt2::shell::GraphicsSettings::kFrameRateOriginal ? "original 30" : "display", s.frameCap, s.vsync ? "on" : "off", s.renderScale,
-                  s.msaa, s.smoothTextures ? "smooth" : "PS1 nearest", s.affine ? "affine" : "perspective", s.maxDetail ? "max" : "original", distance,
+                  s.msaa, s.mipmaps ? "on" : "off", s.anisotropy, s.smoothTextures ? "smooth" : "PS1 nearest",
+                  s.affine ? "affine" : "perspective", s.maxDetail ? "max" : "original", distance,
                   s == gt2::shell::GraphicsSettings::Vanilla() ? " (vanilla)" : "", g_pinned ? " [command line]" : "");
     return std::string(line) + (s.renderHeight ? "; fixed scene " + std::to_string(s.renderHeight * 16 / 9) + "x" + std::to_string(s.renderHeight) : "");
 }
