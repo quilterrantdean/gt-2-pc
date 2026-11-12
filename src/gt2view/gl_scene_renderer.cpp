@@ -283,7 +283,7 @@ void GlSceneRenderer::ApplyTextureOptions(bool sceneItem) {
                                : (smooth ? GL_LINEAR : GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, static_cast<GLint>(mag));
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, static_cast<GLint>(min));
-    const float requested = sceneItem ? float(options_.anisotropy) : 0.0f;
+    const float requested = sceneItem && options_.smoothTextures ? float(options_.anisotropy) : 1.0f;
     if (anisotropyAvailable_) {
         const float use = std::clamp(requested, 1.0f, maxAnisotropy_);
         glTexParameterf(GL_TEXTURE_2D, kGlAnisotropy, use);
@@ -375,8 +375,8 @@ void GlSceneRenderer::UploadTexture(size_t slot) {
     entry.dirty = false;
 }
 
-GLuint GlSceneRenderer::TextureFor(uint32_t page, uint32_t clut, uint32_t flags, const DrawItem& item,
-                                   bool sceneItem) {
+uint32_t GlSceneRenderer::TextureFor(uint32_t page, uint32_t clut, uint32_t flags, const DrawItem& item,
+                                      bool sceneItem) {
     if (flags & kMirrorTexture) return mirrorTextureId_;
     if (flags & kCarPaint) {
         uint32_t x = clut & 0xffffu;
@@ -422,8 +422,8 @@ GLuint GlSceneRenderer::TextureFor(uint32_t page, uint32_t clut, uint32_t flags,
 }
 
 bool GlSceneRenderer::IsClassicTriangle(const SceneVertex& vertex) const {
-    constexpr uint32_t unsupported = kExternalTexture | kHandTexture | kHdUi | kSmoothUi |
-        kMirrorTexture | kModelNative | kModelReflection | kModelBlend | kModelAtlasTexture;
+    constexpr uint32_t unsupported = kExternalTexture | kHandTexture | kHdUi | kReconstructedUi | kUiMap |
+        kSmoothUi | kModelNative | kModelReflection | kModelBlend | kModelAtlasTexture;
     return (vertex.flags & unsupported) == 0;
 }
 
@@ -514,7 +514,7 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, 
         }
 
         if (textured) {
-            GLuint texture = 0;
+            uint32_t texture = 0;
             float textureMinX = 0.0f, textureMinY = 0.0f;
             float textureWidth = 1.0f, textureHeight = 1.0f;
             if (mirrorTexture) {
