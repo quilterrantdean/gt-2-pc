@@ -363,7 +363,20 @@ void GlSceneRenderer::UploadTexture(size_t slot) {
                     ((y * 2 + 1) * side + x * 2 + 1) * 4
                 };
                 const size_t target = (size_t(y) * nextSide + x) * 4;
-                const uint8_t alphaClass = rgba[source[0] + 3];
+                // Keep the majority transparency/STP class in each mip texel.
+                // This avoids making an entire mip pixel transparent merely
+                // because its top-left source texel happened to be transparent.
+                const uint8_t classes[3] = {0, 128, 255};
+                unsigned classCounts[3] = {};
+                for (uint32_t at : source) {
+                    const uint8_t alpha = rgba[at + 3];
+                    for (int k = 0; k < 3; ++k)
+                        if (alpha == classes[k]) ++classCounts[k];
+                }
+                int selectedClass = 0;
+                for (int k = 1; k < 3; ++k)
+                    if (classCounts[k] > classCounts[selectedClass]) selectedClass = k;
+                const uint8_t alphaClass = classes[selectedClass];
                 for (int channel = 0; channel < 3; ++channel) {
                     unsigned sum = 0, count = 0;
                     for (uint32_t at : source) {
