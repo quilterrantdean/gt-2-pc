@@ -1084,7 +1084,8 @@ void ShowSettingsMenu(GameWindow& window) {
                 std::string("Texture filtering: ") + (graphics.smoothTextures ? "Smooth" : "Nearest"),
                 std::string("Mipmapping: ") + (graphics.mipmaps ? "ON" : "OFF"),
                 std::string("Anisotropic filtering: ") +
-                    (graphics.anisotropy == 0 ? "OFF" :
+                    (window.Renderer().MaxAnisotropy() < 2 ? "Unavailable" :
+                     graphics.anisotropy == 0 ? "OFF" :
                      std::to_string(graphics.anisotropy) + "x" +
                      (graphics.anisotropy > int(window.Renderer().MaxAnisotropy()) ? " (unsupported by driver)" :
                       (!graphics.smoothTextures ? " (needs smooth)" : ""))),
