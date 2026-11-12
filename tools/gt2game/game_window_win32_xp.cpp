@@ -7,6 +7,7 @@
 #include <GL/gl.h>
 
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
 #include <thread>
