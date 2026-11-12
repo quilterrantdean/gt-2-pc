@@ -218,7 +218,10 @@ void GlSceneRenderer::UpdateExtent() {
 }
 
 void GlSceneRenderer::SetOptions(const RenderOptions& options) {
+    const bool mipmapsChanged = options_.mipmaps != options.mipmaps;
     options_ = options;
+    if (mipmapsChanged)
+        for (auto& entry : textureEntries_) if (entry.occupied) entry.dirty = true;
     if (swapControlAvailable_) {
         if (!swapInterval_(options_.vsync ? 1 : 0))
             std::printf("graphics: driver rejected the requested VSync setting\n");
@@ -327,7 +330,7 @@ void GlSceneRenderer::UploadTexture(size_t slot) {
 
     uint32_t side = kTextureSide;
     uint32_t level = 0;
-    while (side > 1) {
+    while (options_.mipmaps && side > 1) {
         const uint32_t nextSide = side >> 1;
         std::vector<uint8_t> next(size_t(nextSide) * nextSide * 4);
         for (uint32_t y = 0; y < nextSide; ++y) {
@@ -371,7 +374,8 @@ GLuint GlSceneRenderer::TextureFor(uint32_t page, uint32_t clut, uint32_t flags,
         if (x == 224u && item.brakeLit) x = 240u;
         clut = x | (y << 16);
     }
-    const uint32_t depth = (flags >> 8) & 3u;
+    const uint32_t depth = (flags & kOverlay) ? 2u : ((flags >> 8) & 3u);
+    if (flags & kOverlay) clut = 0;
     const uint32_t clutDepth = (clut & 0x0fffffffu) | (depth << 28);
     const uint64_t key = TextureKey(page, clutDepth);
     size_t slot = 0;
@@ -412,7 +416,7 @@ bool GlSceneRenderer::IsClassicTriangle(const SceneVertex& vertex) const {
     return (vertex.flags & unsupported) == 0;
 }
 
-void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t itemIndex, bool sceneItem) {
+void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, bool sceneItem) {
     if (!item.vertexCount || uint64_t(item.firstVertex) + item.vertexCount > vertices_.size()) return;
     if (item.space == kSpaceMirrorSource) return;
     const SceneVertex* base = vertices_.data() + item.firstVertex;
@@ -464,12 +468,6 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t itemIndex, bool
         glDisable(GL_BLEND);
     }
 
-    const bool itemHasCull = std::any_of(base, base + count, [](const SceneVertex& v) {
-        return (v.flags & kCullBack) != 0;
-    });
-    if (itemHasCull) glEnable(GL_CULL_FACE);
-    else glDisable(GL_CULL_FACE);
-
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_ALPHA_TEST);
     glAlphaFunc(GL_GREATER, 0.0f);
@@ -494,7 +492,6 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t itemIndex, bool
 
         const bool textured = (vertex.flags & (kTextured | kOverlay)) != 0;
         const bool raw = (vertex.flags & kRawTexture) != 0;
-        const bool semiPass = item.stpPass != 0;
         if (item.stpPass == 1) {
             glAlphaFunc(GL_GREATER, 0.75f);
         } else if (item.stpPass == 2) {
@@ -510,7 +507,7 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t itemIndex, bool
             }
             glEnable(GL_TEXTURE_2D);
             glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-            glTexCoordPointer(2, GL_FLOAT, sizeof(SceneVertex), base[first].texel);
+            glTexCoordPointer(2, GL_FLOAT, sizeof(SceneVertex), base->texel);
             if (raw) {
                 glDisableClientState(GL_COLOR_ARRAY);
                 glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
@@ -531,9 +528,10 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t itemIndex, bool
             glEnableClientState(GL_COLOR_ARRAY);
         }
 
+        if (vertex.flags & kCullBack) glEnable(GL_CULL_FACE);
+        else glDisable(GL_CULL_FACE);
         SetProjection(item, vertex.flags);
-        glDrawArrays(GL_TRIANGLES, static_cast<GLint>(item.firstVertex + first),
-                     static_cast<GLsizei>(last - first));
+        glDrawArrays(GL_TRIANGLES, static_cast<GLint>(first), static_cast<GLsizei>(last - first));
         first = last;
     }
 
