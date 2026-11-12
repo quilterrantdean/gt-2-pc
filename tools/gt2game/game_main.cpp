@@ -137,7 +137,11 @@ int GameMain(int argc, char** argv) {
         double replayCheckSeconds = 0;
         bool replayCheckAnalog = false;
         double headlessSeconds = 0;
+#ifdef GT2_XP_CLASSIC
+        int windowWidth = 800, windowHeight = 600;
+#else
         int windowWidth = 1280, windowHeight = 720;
+#endif
         std::string sponsorCategory = "General01"; // 0x800275E8: "General01" unless the menus chose another category
         uint32_t sponsorSeed = 0;
         bool sponsorSeedGiven = false;
