@@ -8,6 +8,13 @@
 
 namespace gt2view {
 void SceneRendererState::ApplyHdUi(std::vector<SceneVertex>& vertices) {
+#ifdef GT2_XP_CLASSIC
+    // The XP Classic profile uses the original disc artwork and native CLUTs.
+    // It deliberately does not load HD media or reserve the external movie
+    // texture store for reconstructed fonts and pictures.
+    (void)vertices;
+    return;
+#else
     if(hdUiGeneration_ != gt2::hd::Generation()) {
         hdUiGeneration_=gt2::hd::Generation(); hdUiPages_.clear(); hdUiSlots_.clear();
         hdUiAssets_.clear(); hdFontAssets_.clear();
@@ -88,5 +95,6 @@ void SceneRendererState::ApplyHdUi(std::vector<SceneVertex>& vertices) {
         v.page=kHdUiTexelBase+uint32_t(it->second)*kHdUiPageTexels;
         v.texel[0]*=4; v.texel[1]*=4; v.flags|=kHdUi;
     }
+#endif
 }
 }
