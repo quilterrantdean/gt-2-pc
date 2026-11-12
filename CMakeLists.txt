@@ -352,6 +352,7 @@ if(GT2_XP_CLASSIC)
   # does not compile, find or link Vulkan/OpenXR components.
   add_library(gt2gl STATIC
     src/gt2view/gl_scene_renderer.cpp
+    src/gt2view/hd_ui.cpp
     src/gt2view/hud.cpp
     src/gt2view/particles.cpp
     src/gt2view/menu_view.cpp
