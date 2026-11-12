@@ -342,9 +342,66 @@ target_link_libraries(gt2verify PRIVATE gt2interp gt2gamelib gt2audio gt2career 
 
 # --- Vulkan renderer and the programs that use it (need the Vulkan SDK: headers, loader, glslc) ---
 if(GT2_XP_CLASSIC)
+  # OpenGL 1.5 fixed-function backend. It shares scene/game construction but
+  # does not compile, find or link Vulkan/OpenXR components.
+  add_library(gt2gl STATIC src/gt2view/gl_scene_renderer.cpp)
+  target_include_directories(gt2gl PUBLIC src)
+  target_compile_definitions(gt2gl PUBLIC GT2_XP_CLASSIC=1 NOMINMAX WIN32_LEAN_AND_MEAN)
+  target_link_libraries(gt2gl PUBLIC gt2export opengl32 gdi32 user32)
+
+  # VR camera maths are shared by the race code; the OpenXR loader/session is not.
+  add_library(gt2xrcommon STATIC src/platform/xr/vr_rig.cpp src/platform/xr/vr_driving.cpp)
+  target_include_directories(gt2xrcommon PUBLIC src)
+  target_compile_definitions(gt2xrcommon PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+
+  add_library(gt2os STATIC src/platform/os/paths_win32.cpp)
+  target_include_directories(gt2os PUBLIC src)
+
   add_executable(gt2xpglcheck tools/gt2xpglcheck/main.cpp)
   target_compile_definitions(gt2xpglcheck PRIVATE WINVER=0x0501 _WIN32_WINNT=0x0501)
   target_link_libraries(gt2xpglcheck PRIVATE opengl32 gdi32 user32)
+
+  # The native game, using the same simulation/menu/audio code as the desktop build.
+  # OpenXR, Vulkan, reconstructed cockpits and their development views are omitted.
+  add_executable(gt2game
+    tools/gt2game/main.cpp
+    tools/gt2game/menu_mode.cpp
+    tools/gt2game/title_mode.cpp
+    tools/gt2game/game_window.cpp
+    tools/gt2game/race_common.cpp
+    tools/gt2game/split_race.cpp
+    tools/gt2game/race_view.cpp
+    tools/gt2game/career_race.cpp
+    tools/gt2game/panel.cpp
+    tools/gt2game/settings_screen.cpp
+    tools/gt2game/race_menu_check.cpp
+    tools/gt2game/machine_test_check.cpp
+    tools/gt2game/change_parts_check.cpp
+    tools/gt2game/race_result_check.cpp
+    tools/gt2game/arcade_race.cpp
+    tools/gt2game/arcade_mode.cpp
+    tools/gt2game/arcade_title.cpp
+    tools/gt2game/title_attract.cpp
+    tools/gt2game/arcade_post_race.cpp
+    tools/gt2game/ghost_replay.cpp
+    tools/gt2game/arcade_menu_check.cpp
+    tools/gt2game/graphics_options.cpp
+    tools/gt2game/frame_interp.cpp
+    tools/gt2game/mods.cpp
+    tools/gt2game/mod_scene.cpp
+    tools/gt2game/movie_player.cpp
+    tools/gt2game/pc_overlay.cpp
+    tools/gt2game/boot_screen.cpp
+    tools/gt2game/game_main.cpp
+    tools/gt2game/game_window_win32_xp.cpp
+    ${GT2_DEV_DUMP_SOURCES})
+  target_compile_definitions(gt2game PRIVATE GT2_XP_CLASSIC=1 WINVER=0x0501 _WIN32_WINNT=0x0501
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+  target_link_libraries(gt2game PRIVATE
+    gt2vfs gt2formats gt2export gt2gamelib gt2audio gt2career gt2menu gt2shell
+    gt2screens gt2camera gt2arcade gt2inputdev gt2gl gt2os gt2xrcommon
+    user32 gdi32 winmm)
+
 elseif(WIN32)
   find_package(Vulkan COMPONENTS glslc)
   if(Vulkan_FOUND AND Vulkan_glslc_FOUND AND WIN32)
