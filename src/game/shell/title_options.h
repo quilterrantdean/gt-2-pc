@@ -105,6 +105,9 @@ struct GraphicsSettings {
     bool mipmaps = true;
 #endif
     int anisotropy = 0;                    // 0 (off), 2 or 4; clamped to the driver's extension limit
+#ifdef GT2_XP_CLASSIC
+    int windowWidth = 800, windowHeight = 600; // actual client area, not an internal render scale
+#endif
     bool smoothTextures = false;           // false: the PS1's nearest texel; true: CLUT-aware bilinear
     bool affine = false;                   // true: the PS1's screen-linear texture mapping; false: perspective-correct
     bool modernCarReflections = false; // opt-in cube reflections for original GT2 bodies
