@@ -15,6 +15,12 @@ if(GT2_XP_CLASSIC)
   set(GT2_BUILD_MACOS_CLIENT OFF CACHE BOOL "Disable macOS client in the XP profile" FORCE)
   set(GT2_BUILD_LINUX_CLIENT OFF CACHE BOOL "Disable Linux client in the XP profile" FORCE)
   add_compile_definitions(GT2_XP_CLASSIC=1 WINVER=0x0501 _WIN32_WINNT=0x0501)
+  if(MINGW)
+    # Emit a PE executable whose declared minimum OS and subsystem are Windows 5.01.
+    add_link_options(-static -static-libgcc -static-libstdc++
+      -Wl,--major-os-version,5,--minor-os-version,1
+      -Wl,--major-subsystem-version,5,--minor-subsystem-version,1)
+  endif()
   message(STATUS "GT2 XP Classic: Win32/i686 profile; Vulkan, VR and developer tests are excluded.")
 endif()
 configure_file(src/game/version.in.h ${CMAKE_CURRENT_BINARY_DIR}/release-version/gt2_version.h @ONLY)
