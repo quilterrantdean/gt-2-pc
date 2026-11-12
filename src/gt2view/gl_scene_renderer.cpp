@@ -159,6 +159,7 @@ GlSceneRenderer::GlSceneRenderer(void* deviceContext, void* window)
     glGenTextures(static_cast<GLsizei>(textureIds_.size()), textureIds_.data());
     glGenTextures(1, &mirrorTextureId_);
     glGenTextures(1, &overlayTextureId_);
+    glGenTextures(1, &externalTextureId_);
     glBindTexture(GL_TEXTURE_2D, mirrorTextureId_);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -193,6 +194,7 @@ GlSceneRenderer::~GlSceneRenderer() {
         if (!textureIds_.empty()) glDeleteTextures(static_cast<GLsizei>(textureIds_.size()), textureIds_.data());
         if (mirrorTextureId_) glDeleteTextures(1, &mirrorTextureId_);
         if (overlayTextureId_) glDeleteTextures(1, &overlayTextureId_);
+        if (externalTextureId_) glDeleteTextures(1, &externalTextureId_);
     }
 }
 
@@ -214,9 +216,23 @@ void GlSceneRenderer::UploadVram(uint32_t firstRow, uint32_t rowCount, const uin
     InvalidateTextures(firstRow, rowCount);
 }
 
-void GlSceneRenderer::UploadExternalTexture(uint32_t, uint32_t, const uint32_t*) {
-    // External RGBA textures are used by optional imported-model/mod paths.
-    // The XP Classic profile deliberately excludes those assets.
+void GlSceneRenderer::UploadExternalTexture(uint32_t first, uint32_t count, const uint32_t* rgba) {
+    // The built-in movie player uploads one decoded RGB frame at kMovieTexelBase.
+    // Imported-car images are excluded by the XP profile, so a single bounded
+    // image store is sufficient and can be replaced on every movie frame.
+    if (!count) {
+        externalTexels_.clear();
+        externalTextureFirst_ = first;
+        externalTextureDirty_ = true;
+        return;
+    }
+    if (!rgba || count > 2048u * 2048u)
+        throw std::runtime_error("OpenGL movie texture upload has an invalid buffer or dimensions");
+    externalTexels_.assign(rgba, rgba + count);
+    externalTextureFirst_ = first;
+    externalTexturePage_ = 0;
+    externalTextureWidth_ = externalTextureHeight_ = 0;
+    externalTextureDirty_ = true;
 }
 
 void GlSceneRenderer::InvalidateTextures(uint32_t firstRow, uint32_t rowCount) {
@@ -402,6 +418,33 @@ void GlSceneRenderer::UploadTexture(size_t slot) {
 uint32_t GlSceneRenderer::TextureFor(uint32_t page, uint32_t clut, uint32_t flags, const DrawItem& item,
                                       bool sceneItem) {
     if (flags & kMirrorTexture) return mirrorTextureId_;
+    if (flags & kExternalTexture) {
+        const uint32_t width = clut & 0xffffu;
+        const uint32_t height = clut >> 16;
+        if (!width || !height || width > maxTextureSize_ || height > maxTextureSize_ ||
+            page < externalTextureFirst_) return 0;
+        const uint64_t offset = uint64_t(page) - externalTextureFirst_;
+        const uint64_t pixels = uint64_t(width) * height;
+        if (offset + pixels > externalTexels_.size()) return 0;
+        if (externalTextureDirty_ || externalTexturePage_ != page ||
+            externalTextureWidth_ != width || externalTextureHeight_ != height) {
+            glBindTexture(GL_TEXTURE_2D, externalTextureId_);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, static_cast<GLsizei>(width),
+                         static_cast<GLsizei>(height), 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                         externalTexels_.data() + static_cast<size_t>(offset));
+            externalTexturePage_ = page;
+            externalTextureWidth_ = width;
+            externalTextureHeight_ = height;
+            externalTextureDirty_ = false;
+        }
+        glBindTexture(GL_TEXTURE_2D, externalTextureId_);
+        ApplyTextureOptions(sceneItem);
+        return externalTextureId_;
+    }
     if (flags & kCarPaint) {
         uint32_t x = clut & 0xffffu;
         uint32_t y = clut >> 16;
@@ -446,7 +489,7 @@ uint32_t GlSceneRenderer::TextureFor(uint32_t page, uint32_t clut, uint32_t flag
 }
 
 bool GlSceneRenderer::IsClassicTriangle(const SceneVertex& vertex) const {
-    constexpr uint32_t unsupported = kExternalTexture | kHandTexture | kHdUi | kReconstructedUi | kUiMap |
+    constexpr uint32_t unsupported = kHandTexture | kHdUi | kReconstructedUi | kUiMap |
         kSmoothUi | kModelNative | kModelReflection | kModelBlend | kModelAtlasTexture;
     return (vertex.flags & unsupported) == 0;
 }
@@ -526,8 +569,9 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, 
         }
 
         const bool overlay = (vertex.flags & kOverlay) != 0;
+        const bool externalTexture = (vertex.flags & kExternalTexture) != 0;
         const bool mirrorTexture = (vertex.flags & kMirrorTexture) != 0;
-        const bool textured = (vertex.flags & kTextured) != 0 || overlay || mirrorTexture;
+        const bool textured = (vertex.flags & kTextured) != 0 || overlay || externalTexture || mirrorTexture;
         const bool raw = (vertex.flags & kRawTexture) != 0;
         if (item.stpPass == 1) {
             glAlphaFunc(GL_GREATER, 0.75f);
@@ -543,6 +587,10 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, 
             float textureWidth = 1.0f, textureHeight = 1.0f;
             if (mirrorTexture) {
                 texture = mirrorTextureId_;
+            } else if (externalTexture) {
+                texture = TextureFor(vertex.page, vertex.clut, vertex.flags, item, sceneItem);
+                textureWidth = static_cast<float>(vertex.clut & 0xffffu);
+                textureHeight = static_cast<float>(vertex.clut >> 16);
             } else if (overlay) {
                 float minX = 1023.0f, minY = 1023.0f, maxX = 0.0f, maxY = 0.0f;
                 for (size_t v = first; v < last; ++v) {
@@ -615,10 +663,10 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, 
             glEnable(GL_TEXTURE_2D);
             glEnableClientState(GL_TEXTURE_COORD_ARRAY);
             glTexCoordPointer(2, GL_FLOAT, sizeof(SceneVertex), base->texel);
-            if (mirrorTexture || overlay) {
+            if (mirrorTexture || overlay || externalTexture) {
                 glMatrixMode(GL_TEXTURE);
                 glLoadIdentity();
-                if (overlay) {
+                if (overlay || externalTexture) {
                     glScalef(1.0f / textureWidth, 1.0f / textureHeight, 1.0f);
                     glTranslatef(-textureMinX, -textureMinY, 0.0f);
                 }
@@ -642,7 +690,7 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, 
                 glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_RGB, GL_SRC_COLOR);
                 // The native 0x80 vertex colour is neutral. Doubling the
                 // normalised 5-bit texture x colour reproduces 255/128.
-                glTexEnvf(GL_TEXTURE_ENV, GL_RGB_SCALE, 2.0f);
+                glTexEnvf(GL_TEXTURE_ENV, GL_RGB_SCALE, externalTexture ? 1.0f : 2.0f);
             }
         } else {
             if (item.stpPass == 1) { first = last; continue; }
