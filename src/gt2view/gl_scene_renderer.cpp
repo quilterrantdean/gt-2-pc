@@ -175,13 +175,16 @@ GlSceneRenderer::GlSceneRenderer(void* deviceContext, void* window)
     glDepthMask(GL_TRUE);
     glClearDepth(0.0);
     glDisable(GL_CULL_FACE);
-    glFrontFace(GL_CCW);
+    // VK front-face is CCW in the game's y-down screen space; after the Y flip
+    // into OpenGL's y-up window coordinates the equivalent winding is CW.
+    glFrontFace(GL_CW);
     glDisable(GL_DITHER);
     glDisable(GL_FOG);
     glDisable(GL_LIGHTING);
     glDisable(GL_ALPHA_TEST);
     glDisable(GL_BLEND);
     glShadeModel(GL_SMOOTH);
+    glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     UpdateExtent();
     SetOptions(options_);
