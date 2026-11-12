@@ -104,6 +104,7 @@ GameWindow::GameWindow(const std::string& title, int clientWidth, int clientHeig
     if (retainedBackend) {
         backend_ = std::move(retainedBackend); backend_->ConfigureVr(); backend_->SetTitle(title);
     } else backend_ = g_vr ? CreateXrWindowBackend(title, clientWidth, clientHeight) : CreateWindowBackend(title, clientWidth, clientHeight);
+    backend_->Renderer().SetOptions(RenderOptionsOf(CurrentGraphics()));
     PrepareNativeUi(backend_->Renderer());
     input_.AttachWindow(backend_->NativeHandle());
     vrInput_ = backend_->CreateInputDevice();
