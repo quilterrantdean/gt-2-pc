@@ -30,6 +30,7 @@ public:
     }
     void* NativeHandle() const override { return hwnd_; }
     void SetTitle(const std::string& title) override { SetWindowTextA(hwnd_, title.c_str()); }
+    bool SetClientSize(int width, int height) override;
     void Pump() override;
     bool Closed() const override { return closed_; }
     void Close() override { closed_ = true; }
@@ -113,7 +114,17 @@ Win32XpWindow::Win32XpWindow(const std::string& title, int clientWidth, int clie
     const bool hidden = windowMode && std::string(windowMode) == "hidden";
     const bool noFocus = hidden || WindowNoFocus() || std::getenv("GT2_NO_FOCUS") != nullptr;
     canFullscreen_ = !hidden && withRenderer;
-    if (withRenderer) CreateOpenGlContext();
+    if (withRenderer) {
+        try {
+            CreateOpenGlContext();
+        } catch (...) {
+            if (context_) { wglMakeCurrent(nullptr, nullptr); wglDeleteContext(context_); context_ = nullptr; }
+            if (dc_) { ReleaseDC(hwnd_, dc_); dc_ = nullptr; }
+            SetWindowLongPtrA(hwnd_, GWLP_USERDATA, 0);
+            DestroyWindow(hwnd_); hwnd_ = nullptr;
+            throw;
+        }
+    }
 
     if (canFullscreen_ && !noFocus && !WindowedMode()) ToggleFullscreen();
     if (hidden) {
@@ -154,6 +165,16 @@ void Win32XpWindow::CreateOpenGlContext() {
         throw std::runtime_error("wglMakeCurrent failed");
 
     renderer_ = std::make_unique<gt2view::GlSceneRenderer>(dc_, hwnd_);
+}
+
+bool Win32XpWindow::SetClientSize(int width, int height) {
+    if (width < 320 || height < 240 || width > 4096 || height > 2160 || fullscreen_) return false;
+    RECT rect{0, 0, width, height};
+    const DWORD style = static_cast<DWORD>(GetWindowLongPtrA(hwnd_, GWL_STYLE));
+    const DWORD exStyle = static_cast<DWORD>(GetWindowLongPtrA(hwnd_, GWL_EXSTYLE));
+    if (!AdjustWindowRectEx(&rect, style, FALSE, exStyle)) return false;
+    return SetWindowPos(hwnd_, nullptr, 0, 0, rect.right - rect.left, rect.bottom - rect.top,
+                        SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE) != FALSE;
 }
 
 void Win32XpWindow::ToggleFullscreen() {
