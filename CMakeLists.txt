@@ -352,6 +352,8 @@ if(GT2_XP_CLASSIC)
   # does not compile, find or link Vulkan/OpenXR components.
   add_library(gt2gl STATIC
     src/gt2view/gl_scene_renderer.cpp
+    src/gt2view/glow.cpp
+    src/gt2view/procedural_cockpit_xp.cpp
     src/gt2view/hd_ui.cpp
     src/gt2view/hud.cpp
     src/gt2view/particles.cpp
@@ -409,6 +411,7 @@ if(GT2_XP_CLASSIC)
     tools/gt2game/boot_screen.cpp
     tools/gt2game/game_main.cpp
     tools/gt2game/game_window_win32_xp.cpp
+    tools/gt2game/cockpit_preview.cpp
     ${GT2_DEV_DUMP_SOURCES})
   target_compile_definitions(gt2game PRIVATE GT2_XP_CLASSIC=1 WINVER=0x0501 _WIN32_WINNT=0x0501
     NOMINMAX WIN32_LEAN_AND_MEAN)

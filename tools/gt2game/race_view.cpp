@@ -799,7 +799,11 @@ RaceViewResult RunRaceView(GameWindow& window, Panels* panels, const DiscImage& 
         const bool cameraInterp = interp && !CameraCut(previous.camera, cam);
         camera::CameraProjection p = cameraInterp ? InterpolatedProjection(previous.camera, cam, at) : camera::ProjectionOf(cam);
         const auto& fit = assets.SlotCockpitFit(carSlot);
+        #ifdef GT2_XP_CLASSIC
+        const bool inCockpit = false; // retain the original camera and screen-space rear-view mirror
+#else
         const bool inCockpit = fit.valid && CockpitShown(cam, selectedView == 0, replaying || data.constants.flag800A951C != 0, config.oldCamera, race.HoldFrames());
+#endif
         if (inCockpit) {
             float model[16];
             carRenderPose(0,carSlot,alpha,model);
@@ -1540,7 +1544,11 @@ RaceViewResult RunRaceView(GameWindow& window, Panels* panels, const DiscImage& 
         int hiddenCar = -1;                                // camera + 0x108: the followed car is not drawn (driver view)
         assets.SetGt4Enabled(OverlayGt4ModelSet());
         const auto& cockpitFit = assets.SlotCockpitFit(carSlot);
+        #ifdef GT2_XP_CLASSIC
+        const bool inCockpit = false;
+#else
         const bool inCockpit = cockpitFit.valid && CockpitShown(cam, selectedView == 0, replaying || data.constants.flag800A951C != 0, config.oldCamera, race.HoldFrames());
+#endif
         if (!config.oldCamera) {
             camera::CameraProjection p = cameraInterp ? InterpolatedProjection(previous.camera, cam, at) : camera::ProjectionOf(cam);
             if (inCockpit) {

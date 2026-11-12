@@ -1301,11 +1301,15 @@ int RunArcadeMode(const DiscImage& disc, const GtfsVolume& vol, const ArcadeMode
             if (carItems.size() > before) carItems[before].clearDepth = 1;
             if (std::getenv("GT2_ARCADE_TRACE")) std::printf("arcade f%d: car %s, %zu car item(s)\n", field, UnpackCarId(shownCar).c_str(), carItems.size() - before);
         }
+#ifndef GT2_XP_CLASSIC
         if(carProjection)gt2view::AppendCockpitBadge(prims,carView->HasNativeInterior(),12,96);
+#endif
         if(carProjection && (menus.Current()==arcade::ArcadeView::kCar || menus.Current()==arcade::ArcadeView::kGarage))
             AppendCockpitPreviewButton(prims,VrMode(),12,450);
         for(int p=0;p<2;++p)if(battleCars[size_t(p)])
+#ifndef GT2_XP_CLASSIC
             gt2view::AppendCockpitBadge(prims,carView->HasNativeInterior(p),battleCars[size_t(p)]->x0+8,battleCars[size_t(p)]->y0+28);
+#endif
         view->Build(prims, TitleAssets::kScreenWidth, renderer->AspectRatio(), items, options.squarePixels, carLayerAt, carItems);
         std::string shotPath, comparePath;
         for (size_t k = 0; k < options.shots.size(); k++)

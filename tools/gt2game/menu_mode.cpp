@@ -364,7 +364,9 @@ int RunMenuSession(GameWindow& window, const DiscImage& disc, const GtfsVolume& 
                 cv->Append(out, carProjection, paint, renderer.AspectRatio(), options.squarePixels);
             };
         }
+#ifndef GT2_XP_CLASSIC
         if(viewport && car.shown)gt2view::AppendCockpitBadge(frame.prims,carView->HasNativeInterior(),viewport->x0+8,viewport->y0+44);
+#endif
         if(viewport && car.shown && runtime.PopupMode()==0)gt2game::AppendCockpitPreviewButton(frame.prims,gt2game::VrMode(),viewport->x0+8,viewport->y0+73);
         std::vector<gt2view::DrawItem> items;
         view.Build(frame, renderer.AspectRatio(), items, options.squarePixels, layer3d);
