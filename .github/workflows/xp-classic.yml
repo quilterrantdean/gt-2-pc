@@ -43,9 +43,11 @@ jobs:
             file="build-xp/$exe.exe"
             objdump -f "$file" | grep -q "file format pei-i386"
             objdump -p "$file" > "build-xp/$exe-imports.txt"
+            grep -qE "MajorOSystemVersion[[:space:]]+5" "build-xp/$exe-imports.txt"
+            grep -qE "MinorOSystemVersion[[:space:]]+1" "build-xp/$exe-imports.txt"
             grep -qE "MajorSubsystemVersion[[:space:]]+5" "build-xp/$exe-imports.txt"
             grep -qE "MinorSubsystemVersion[[:space:]]+1" "build-xp/$exe-imports.txt"
-            echo "Verified i686 / Windows 5.1: $file"
+            echo "Verified i686 / PE OS 5.1 / subsystem 5.1: $file"
             grep "DLL Name" "build-xp/$exe-imports.txt"
             if grep -Eq "GetTickCount64|CancelIoEx|SetProcessDpiAwarenessContext|CreateWaitableTimerExW|DwmGetCompositionTimingInfo|GetSystemTimePreciseAsFileTime|InitializeCriticalSectionEx" "build-xp/$exe-imports.txt"; then
               echo "ERROR: Vista-or-later API imported by $file" >&2

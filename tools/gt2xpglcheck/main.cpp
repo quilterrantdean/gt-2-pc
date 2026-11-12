@@ -16,6 +16,8 @@ using WglGetExtensionsStringARB = const char* (WINAPI*)(HDC);
 using WglGetExtensionsStringEXT = const char* (WINAPI*)();
 using WglSwapIntervalEXT = BOOL (WINAPI*)(int);
 using WglGetSwapIntervalEXT = int (WINAPI*)();
+using GlBlendEquation = void (WINAPI*)(GLenum);
+using GlBlendColor = void (WINAPI*)(GLfloat, GLfloat, GLfloat, GLfloat);
 
 template <typename T>
 T WglProc(const char* name) {
@@ -136,6 +138,9 @@ int Run() {
     WglGetSwapIntervalEXT getSwapInterval = hasSwapControl ? WglProc<WglGetSwapIntervalEXT>("wglGetSwapIntervalEXT") : nullptr;
     bool vsyncSet = false;
     int currentSwapInterval = -1;
+    GlBlendEquation blendEquation = WglProc<GlBlendEquation>("glBlendEquation");
+    GlBlendColor blendColor = WglProc<GlBlendColor>("glBlendColor");
+    const bool blendSupport = blendEquation && blendColor;
     if (swapInterval) vsyncSet = swapInterval(1) == TRUE;
     if (getSwapInterval) currentSwapInterval = getSwapInterval();
 
@@ -151,16 +156,21 @@ int Run() {
     std::printf("Anisotropic    : %s", hasAnisotropy ? "yes" : "no");
     if (hasAnisotropy) std::printf(" (maximum %.1fx)", static_cast<double>(maxAnisotropy));
     std::printf("\n");
+    std::printf("Blend equations: %s\n", blendEquation ? "available" : "MISSING");
+    std::printf("Blend colour   : %s\n", blendColor ? "available" : "MISSING");
     std::printf("WGL swap ctrl  : %s\n", hasSwapControl && swapInterval ? "available" : "unavailable");
     if (currentSwapInterval >= 0) std::printf("VSync interval : %d\n", currentSwapInterval);
     else if (vsyncSet) std::printf("VSync interval : set to 1 (query unavailable)\n");
 
     const bool software = renderer && (std::strstr(renderer, "GDI Generic") || std::strstr(renderer, "Microsoft"));
     if (software) std::printf("WARNING: the active renderer appears to be software, not the NVIDIA GPU.\n");
-    if (major < 1 || (major == 1 && minor < 5))
-        std::printf("FAIL: this driver does not expose the required OpenGL 1.5 baseline.\n");
-    else
-        std::printf("PASS: OpenGL 1.5 baseline detected.\n");
+    const bool versionSupport = major > 1 || (major == 1 && minor >= 5);
+    const bool textureSupport = maxTextureSize >= 256;
+    if (!versionSupport) std::printf("FAIL: OpenGL 1.5 is required.\n");
+    if (!textureSupport) std::printf("FAIL: a 256 x 256 texture is required; driver limit is %d.\n", maxTextureSize);
+    if (!blendSupport) std::printf("FAIL: glBlendEquation and glBlendColor are required.\n");
+    if (versionSupport && textureSupport && blendSupport)
+        std::printf("PASS: OpenGL fixed-function baseline detected.\n");
 
     glClearColor(0.15f, 0.20f, 0.25f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -171,7 +181,7 @@ int Run() {
     wglDeleteContext(context);
     ReleaseDC(window, dc);
     DestroyWindow(window);
-    return (major > 1 || (major == 1 && minor >= 5)) && swapped ? 0 : 2;
+    return versionSupport && textureSupport && blendSupport && swapped ? 0 : 2;
 }
 
 } // namespace
