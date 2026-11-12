@@ -146,6 +146,13 @@ GlSceneRenderer::GlSceneRenderer(void* deviceContext, void* window)
         throw std::runtime_error("OpenGL 1.5 driver is missing the required blend entry points");
 
     glGenTextures(static_cast<GLsizei>(textureIds_.size()), textureIds_.data());
+    glGenTextures(1, &mirrorTextureId_);
+    glGenTextures(1, &overlayTextureId_);
+    glBindTexture(GL_TEXTURE_2D, mirrorTextureId_);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_GEQUAL);
     glDepthMask(GL_TRUE);
@@ -171,8 +178,11 @@ GlSceneRenderer::GlSceneRenderer(void* deviceContext, void* window)
 }
 
 GlSceneRenderer::~GlSceneRenderer() {
-    if (!textureIds_.empty() && wglGetCurrentContext())
-        glDeleteTextures(static_cast<GLsizei>(textureIds_.size()), textureIds_.data());
+    if (wglGetCurrentContext()) {
+        if (!textureIds_.empty()) glDeleteTextures(static_cast<GLsizei>(textureIds_.size()), textureIds_.data());
+        if (mirrorTextureId_) glDeleteTextures(1, &mirrorTextureId_);
+        if (overlayTextureId_) glDeleteTextures(1, &overlayTextureId_);
+    }
 }
 
 void GlSceneRenderer::SetVertices(uint32_t first, const std::vector<SceneVertex>& vertices) {
@@ -367,6 +377,7 @@ void GlSceneRenderer::UploadTexture(size_t slot) {
 
 GLuint GlSceneRenderer::TextureFor(uint32_t page, uint32_t clut, uint32_t flags, const DrawItem& item,
                                    bool sceneItem) {
+    if (flags & kMirrorTexture) return mirrorTextureId_;
     if (flags & kCarPaint) {
         uint32_t x = clut & 0xffffu;
         uint32_t y = clut >> 16;
@@ -416,9 +427,9 @@ bool GlSceneRenderer::IsClassicTriangle(const SceneVertex& vertex) const {
     return (vertex.flags & unsupported) == 0;
 }
 
-void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, bool sceneItem) {
+void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, bool sceneItem, bool mirrorPass) {
     if (!item.vertexCount || uint64_t(item.firstVertex) + item.vertexCount > vertices_.size()) return;
-    if (item.space == kSpaceMirrorSource) return;
+    if ((item.space == kSpaceMirrorSource) != mirrorPass) return;
     const SceneVertex* base = vertices_.data() + item.firstVertex;
     const uint32_t count = item.vertexCount - (item.vertexCount % 3u);
     if (!count) return;
@@ -490,7 +501,9 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, 
             last += 3;
         }
 
-        const bool textured = (vertex.flags & (kTextured | kOverlay)) != 0;
+        const bool overlay = (vertex.flags & kOverlay) != 0;
+        const bool mirrorTexture = (vertex.flags & kMirrorTexture) != 0;
+        const bool textured = (vertex.flags & kTextured) != 0 || overlay || mirrorTexture;
         const bool raw = (vertex.flags & kRawTexture) != 0;
         if (item.stpPass == 1) {
             glAlphaFunc(GL_GREATER, 0.75f);
@@ -501,14 +514,94 @@ void GlSceneRenderer::DrawItemRange(const DrawItem& item, size_t /*itemIndex*/, 
         }
 
         if (textured) {
-            if (TextureFor(vertex.page, vertex.clut, vertex.flags, item, sceneItem) == 0) {
+            GLuint texture = 0;
+            float textureMinX = 0.0f, textureMinY = 0.0f;
+            float textureWidth = 1.0f, textureHeight = 1.0f;
+            if (mirrorTexture) {
+                texture = mirrorTextureId_;
+            } else if (overlay) {
+                float minX = 1023.0f, minY = 1023.0f, maxX = 0.0f, maxY = 0.0f;
+                for (size_t v = first; v < last; ++v) {
+                    minX = std::min(minX, base[v].texel[0]);
+                    minY = std::min(minY, base[v].texel[1]);
+                    maxX = std::max(maxX, base[v].texel[0]);
+                    maxY = std::max(maxY, base[v].texel[1]);
+                }
+                const int x0 = std::clamp(static_cast<int>(std::floor(minX)), 0, 1023);
+                const int y0 = std::clamp(static_cast<int>(std::floor(minY)), 0, 1023);
+                const int x1 = std::clamp(static_cast<int>(std::ceil(maxX)), x0, 1023);
+                const int y1 = std::clamp(static_cast<int>(std::ceil(maxY)), y0, 1023);
+                const uint32_t pageX = vertex.page & 0xffffu;
+                const uint32_t pageY = vertex.page >> 16;
+                const uint32_t width = static_cast<uint32_t>(x1 - x0 + 1);
+                const uint32_t height = static_cast<uint32_t>(y1 - y0 + 1);
+                if (pageX + static_cast<uint32_t>(x1) >= kVramWidth ||
+                    pageY + static_cast<uint32_t>(y1) >= kVramRows ||
+                    width > maxTextureSize_ || height > maxTextureSize_) {
+                    if (!warnedUnsupported_) {
+                        std::printf("graphics: an overlay texture exceeds the active OpenGL limits\n");
+                        warnedUnsupported_ = true;
+                    }
+                    first = last;
+                    continue;
+                }
+                std::vector<uint8_t> rgba(size_t(width) * height * 4);
+                for (uint32_t y = 0; y < height; ++y) {
+                    for (uint32_t x = 0; x < width; ++x) {
+                        const uint32_t texel = vram_[size_t(pageY + y0 + static_cast<int>(y)) * kVramWidth +
+                                                     pageX + x0 + static_cast<int>(x)];
+                        const size_t at = (size_t(y) * width + x) * 4;
+                        rgba[at] = Expand5(texel & 31u);
+                        rgba[at + 1] = Expand5((texel >> 5) & 31u);
+                        rgba[at + 2] = Expand5((texel >> 10) & 31u);
+                        rgba[at + 3] = (texel & 0x8000u) ? 255 : 0;
+                    }
+                }
+                glBindTexture(GL_TEXTURE_2D, overlayTextureId_);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, static_cast<GLsizei>(width),
+                             static_cast<GLsizei>(height), 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+                texture = overlayTextureId_;
+                textureMinX = static_cast<float>(x0);
+                textureMinY = static_cast<float>(y0);
+                textureWidth = static_cast<float>(width);
+                textureHeight = static_cast<float>(height);
+            } else {
+                texture = TextureFor(vertex.page, vertex.clut, vertex.flags, item, sceneItem);
+            }
+            if (!texture) {
                 first = last;
                 continue;
+            }
+            glBindTexture(GL_TEXTURE_2D, texture);
+            if (mirrorTexture) {
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            } else if (overlay) {
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             }
             glEnable(GL_TEXTURE_2D);
             glEnableClientState(GL_TEXTURE_COORD_ARRAY);
             glTexCoordPointer(2, GL_FLOAT, sizeof(SceneVertex), base->texel);
-            if (raw) {
+            if (mirrorTexture || overlay) {
+                glMatrixMode(GL_TEXTURE);
+                glLoadIdentity();
+                if (overlay) {
+                    glScalef(1.0f / textureWidth, 1.0f / textureHeight, 1.0f);
+                    glTranslatef(-textureMinX, -textureMinY, 0.0f);
+                }
+                glMatrixMode(GL_MODELVIEW);
+            } else {
+                glMatrixMode(GL_TEXTURE);
+                glLoadIdentity();
+                glScalef(1.0f / 256.0f, 1.0f / 256.0f, 1.0f);
+                glMatrixMode(GL_MODELVIEW);
+            }
+            if (raw || mirrorTexture || overlay) {
                 glDisableClientState(GL_COLOR_ARRAY);
                 glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
             } else {
@@ -576,6 +669,36 @@ void GlSceneRenderer::Draw(const std::vector<DrawItem>& items, const std::string
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     cachedMaterials_ = uncachedMaterials_ = 0;
     sceneItems = std::min(sceneItems, items.size());
+
+    const bool hasMirror = std::any_of(items.begin(), items.end(), [](const DrawItem& item) {
+        return item.space == kSpaceMirrorSource && item.vertexCount != 0;
+    });
+    if (hasMirror) {
+        const Size windowExtent = extent_;
+        extent_ = {512, 256};
+        glViewport(0, 0, 512, 256);
+        glClearColor(clearColor[0], clearColor[1], clearColor[2], 1.0f);
+        glClearDepth(0.0);
+        glDepthMask(GL_TRUE);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glMatrixMode(GL_MODELVIEW);
+        for (size_t i = 0; i < items.size(); ++i)
+            if (items[i].space == kSpaceMirrorSource) DrawItemRange(items[i], i, i < sceneItems, true);
+        glFlush();
+        glBindTexture(GL_TEXTURE_2D, mirrorTextureId_);
+        glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 0, 0, 512, 256, 0);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        extent_ = windowExtent;
+        glViewport(0, 0, static_cast<GLsizei>(extent_.width), static_cast<GLsizei>(extent_.height));
+        glClearColor(clearColor[0], clearColor[1], clearColor[2], 1.0f);
+        glClearDepth(0.0);
+        glDepthMask(GL_TRUE);
+        glDisable(GL_SCISSOR_TEST);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
