@@ -55,6 +55,26 @@ void ReadAxes(Handle& h) {
         dead.dwData = 10000; h.device->SetProperty(DIPROP_SATURATION, &dead.diph);
     }
 }
+
+// DirectInput 8 declares this callback with CALLBACK (__stdcall). A lambda's
+// conversion to a function pointer is cdecl on 32-bit MinGW, so use a named
+// callback to keep the Win32 ABI correct.
+BOOL CALLBACK EnumerateDeviceCallback(const DIDEVICEINSTANCEA* instance, VOID* context) {
+    static_cast<std::vector<DIDEVICEINSTANCEA>*>(context)->push_back(*instance);
+    return DIENUM_CONTINUE;
+}
+
+// GetTickCount64 is not available on Windows XP. Extend the XP GetTickCount
+// counter to 64 bits; the wheel rig polls and updates feedback on its game
+// thread, and this also handles the 49.7-day DWORD wraparound.
+ULONGLONG TickCount64Compat() {
+    static DWORD previous = GetTickCount();
+    static ULONGLONG high = 0;
+    const DWORD now = GetTickCount();
+    if (now < previous) high += (ULONGLONG(1) << 32);
+    previous = now;
+    return high | now;
+}
 }
 struct Rig::Hardware {
     HWND window = nullptr;
@@ -68,9 +88,8 @@ struct Rig::Hardware {
         if (!input || !window) return;
         InputCallTimer timer("wheel device enumeration");
         std::vector<DIDEVICEINSTANCEA> instances;
-        const HRESULT result = input->EnumDevices(DI8DEVCLASS_GAMECTRL, [](const DIDEVICEINSTANCEA* i, VOID* p) -> BOOL {
-            static_cast<std::vector<DIDEVICEINSTANCEA>*>(p)->push_back(*i); return DIENUM_CONTINUE;
-        }, &instances, DIEDFL_ATTACHEDONLY);
+        const HRESULT result = input->EnumDevices(DI8DEVCLASS_GAMECTRL, EnumerateDeviceCallback,
+                                                     &instances, DIEDFL_ATTACHEDONLY);
         if (FAILED(result)) return;
         std::erase_if(handles, [&](const auto& h) {
             return std::none_of(instances.begin(), instances.end(), [&](const auto& i) { return h->state.id == InstanceId(&i.guidInstance); });
@@ -108,7 +127,7 @@ struct Rig::Hardware {
     void Poll(bool focus, std::vector<DeviceState>& states) {
         InputCallTimer timer("wheel hardware poll (including enumeration/acquire)");
         focused = focus;
-        const auto now = GetTickCount64();
+        const auto now = TickCount64Compat();
         if (rescan && now >= scanAt) { Enumerate(); rescan = false; scanAt = now + 250; }
         if (!focus || (forceAt && now - forceAt > 150)) Stop();
         states.clear();
@@ -178,7 +197,7 @@ struct Rig::Hardware {
             } else hr = h->effect->SetParameters(&effect, DIEP_TYPESPECIFICPARAMS);
             if (SUCCEEDED(hr) && h->effect) hr = h->effect->Start(1, 0);
             if (FAILED(hr)) { h->Stop(); status = "FFB driver rejected constant force (check PC mode)"; }
-            else { h->effectRunning = true; forceAt = GetTickCount64(); status = "Force feedback ready"; }
+            else { h->effectRunning = true; forceAt = TickCount64Compat(); status = "Force feedback ready"; }
             return;
         }
         status = "Steering device disconnected";
