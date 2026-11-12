@@ -1189,8 +1189,14 @@ void ShowSettingsMenu(GameWindow& window) {
 #ifndef GT2_XP_CLASSIC
                     else if (selected == 6) { page = 10; selected = 0; status = "Driver view settings."; }
 #endif
+#ifdef GT2_XP_CLASSIC
+                    else if (discImportAvailable && selected == 7) { page = 11; selected = 1; }
+                    else if (selected == 7 + int(discImportAvailable)) { done = ShowCampaignManager(window); }
+                    else if (selected >= 8 + int(discImportAvailable)) { page = 12; selected = 1; }
+#else
                     else if (selected == 8 + int(discImportAvailable)) { done = ShowCampaignManager(window); }
                     else if (selected >= 8) { page = discImportAvailable && selected == 8 ? 11 : 12; selected = 1; }
+#endif
                     else if (selected >= 5) { if (selected == 5) window.RequestGamePause(); done = true; }
                     else { page = selected == 3 ? 6 : selected == 2 ? 4 : selected + 1; selected = 0; }
                 }
@@ -1219,7 +1225,11 @@ void ShowSettingsMenu(GameWindow& window) {
                         gameChangeDirect = false;
                         std::puts(discImportRequested ? "player: disc import requested" : "player: quit requested");
                         window.Close(); done = true;
+#ifdef GT2_XP_CLASSIC
+                    } else { selected = page == 11 ? 7 : int(discImportAvailable) + 8; page = 0; }
+#else
                     } else { selected = page == 11 ? 8 : int(discImportAvailable) + 9; page = 0; }
+#endif
                 }
                 else if (page == 9 && accept) {
                     if (selected == 0) {
